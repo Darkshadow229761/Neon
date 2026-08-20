@@ -1,0 +1,227 @@
+create extension if not exists pgcrypto;
+
+
+-- =========================================
+-- PROFILES
+-- =========================================
+
+create table if not exists public.profiles (
+  id uuid primary key
+    references auth.users(id)
+    on delete cascade,
+
+  username text,
+  
+  role text not null default 'player'
+    check (role in ('player', 'admin')),
+
+  created_at timestamptz
+    not null default now()
+);
+
+
+-- =========================================
+-- ENABLE RLS
+-- =========================================
+
+alter table public.profiles
+enable row level security;
+
+
+-- =========================================
+-- HELPER: CHECK ADMIN
+-- =========================================
+
+create or replace function public.is_admin()
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1
+    from public.profiles
+    where id = auth.uid()
+      and role = 'admin'
+  );
+$$;
+
+
+-- =========================================
+-- PROFILE POLICIES
+-- =========================================
+
+drop policy if exists
+  "users can view own profile"
+on public.profiles;
+
+create policy
+  "users can view own profile"
+on public.profiles
+for select
+to authenticated
+using (
+  id = auth.uid()
+);
+
+
+drop policy if exists
+  "admins can view all profiles"
+on public.profiles;
+
+create policy
+  "admins can view all profiles"
+on public.profiles
+for select
+to authenticated
+using (
+  public.is_admin()
+);
+
+
+drop policy if exists
+  "users can update own profile"
+on public.profiles;
+
+create policy
+  "users can update own profile"
+on public.profiles
+for update
+to authenticated
+using (
+  id = auth.uid()
+)
+with check (
+  id = auth.uid()
+);
+
+
+-- =========================================
+-- AUTO-CREATE PROFILE
+-- =========================================
+
+create or replace function
+public.handle_new_user()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+
+  insert into public.profiles (
+    id,
+    username
+  )
+  values (
+    new.id,
+    coalesce(
+      new.raw_user_meta_data ->> 'username',
+      split_part(new.email, '@', 1)
+    )
+  );
+
+  return new;
+
+end;
+$$;
+
+
+drop trigger if exists
+  on_auth_user_created
+on auth.users;
+
+
+create trigger
+  on_auth_user_created
+
+after insert on auth.users
+
+for each row
+execute procedure
+public.handle_new_user();
+
+
+-- =========================================
+-- IMPORTANT:
+-- RUN THIS ONLY AFTER YOUR ACCOUNT EXISTS
+-- =========================================
+
+-- Replace with the email you want to make admin.
+--
+-- UPDATE public.profiles
+-- SET role = 'admin'
+-- WHERE id = (
+--   SELECT id
+--   FROM auth.users
+--   WHERE email = 'YOUR_ADMIN_EMAIL_HERE'
+-- );
+
+
+-- =========================================
+-- SCORES
+-- =========================================
+
+create table if not exists public.scores (
+  id uuid primary key
+    default gen_random_uuid(),
+
+  user_id uuid
+    references auth.users(id)
+    on delete cascade,
+
+  game text not null,
+
+  score integer not null
+    check (score >= 0),
+
+  created_at timestamptz
+    not null default now()
+);
+
+
+alter table public.scores
+enable row level security;
+
+
+drop policy if exists
+  "users can insert own scores"
+on public.scores;
+
+create policy
+  "users can insert own scores"
+on public.scores
+for insert
+to authenticated
+with check (
+  user_id = auth.uid()
+);
+
+
+drop policy if exists
+  "users can view own scores"
+on public.scores;
+
+create policy
+  "users can view own scores"
+on public.scores
+for select
+to authenticated
+using (
+  user_id = auth.uid()
+);
+
+
+drop policy if exists
+  "admins can view all scores"
+on public.scores;
+
+create policy
+  "admins can view all scores"
+on public.scores
+for select
+to authenticated
+using (
+  public.is_admin()
+);
