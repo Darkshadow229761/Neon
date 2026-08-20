@@ -1,0 +1,110 @@
+export default function Navbar({
+  page,
+  setPage,
+  user,
+  profile,
+  onAuth,
+  onLogout
+}) {
+  function navigate(target) {
+    setPage(target);
+    window.scrollTo({
+      top: 0,
+      behavior: "smooth"
+    });
+  }
+
+  return (
+    <header className="navbar">
+      <button
+        className="brand"
+        onClick={() => navigate("home")}
+      >
+        <span className="brand-orb" />
+        <span>
+          NEXUS<span className="cyan">PLAY</span>
+        </span>
+      </button>
+
+      <nav className="nav-links">
+        <button
+          className={
+            page === "home"
+              ? "nav-active"
+              : ""
+          }
+          onClick={() => navigate("home")}
+        >
+          HOME
+        </button>
+
+        <button
+          className={
+            page === "games"
+              ? "nav-active"
+              : ""
+          }
+          onClick={() => navigate("games")}
+        >
+          GAMES
+        </button>
+
+        {user && (
+          <button
+            className={
+              page === "profile"
+                ? "nav-active"
+                : ""
+            }
+            onClick={() => navigate("profile")}
+          >
+            PROFILE
+          </button>
+        )}
+
+        {profile?.role === "admin" && (
+          <button
+            className={
+              page === "admin"
+                ? "nav-active admin-link"
+                : "admin-link"
+            }
+            onClick={() => navigate("admin")}
+          >
+            ADMIN
+          </button>
+        )}
+      </nav>
+
+      <div className="nav-account">
+        {user ? (
+          <>
+            <button
+              className="account-pill"
+              onClick={() => navigate("profile")}
+            >
+              <span className="online-dot" />
+              {profile?.username ||
+                user.email?.split("@")[0] ||
+                "PLAYER"}
+            </button>
+
+            <button
+              className="logout-button"
+              onClick={onLogout}
+            >
+              EXIT
+            </button>
+          </>
+        ) : (
+          <button
+            className="account-pill"
+            onClick={onAuth}
+          >
+            ACCOUNT
+          </button>
+        )}
+      </div>
+    </header>
+  );
+}
