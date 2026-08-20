@@ -155,7 +155,7 @@ public.handle_new_user();
 -- WHERE id = (
 --   SELECT id
 --   FROM auth.users
---   WHERE email = 'YOUR_ADMIN_EMAIL_HERE'
+--   WHERE email = 'aayushmaanshah701@gmail.com'
 -- );
 
 
